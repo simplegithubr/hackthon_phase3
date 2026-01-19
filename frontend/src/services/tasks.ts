@@ -18,7 +18,7 @@ export class TaskService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://sagardeveloper-todo-phase2.hf.space";
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://sagardeveloper-todo-phase3.hf.space";
   }
 
   /**
