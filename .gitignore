@@ -3,5 +3,7 @@ __pycache__/
 .env
 .env.example
 tmpclaude-*
-nul
+nuln
+.next/
+
 

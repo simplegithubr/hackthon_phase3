@@ -208,18 +208,34 @@ const ChatBoard: React.FC<ChatBoardProps> = ({ className = '' }) => {
       };
 
       // Call the backend API
-      const response = await fetch('http://127.0.0.1:8000/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
+      // const response = await fetch('http://127.0.0.1:8000/api/chat', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': `Bearer ${token}`,
+      //   },
+      //   body: JSON.stringify(requestBody),
+      // });
 
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
+      // if (!response.ok) {
+      //   throw new Error(`API request failed with status ${response.status}`);
+      // }
+      const response = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/chat`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(requestBody),
+  }
+);
+
+if (!response.ok) {
+  throw new Error(`API request failed with status ${response.status}`);
+}
+
 
       const data: ChatApiResponse = await response.json();
 
