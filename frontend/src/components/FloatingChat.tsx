@@ -43,24 +43,22 @@ const TasksDisplay: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
         {tasks.map((task) => (
           <div
             key={task.id}
-            className={`p-3 rounded-lg border ${
-              task.is_complete
-                ? 'bg-green-50 border-green-200 text-green-800'
-                : 'bg-white border-gray-200 text-gray-800'
-            }`}
+            className={`p-3 rounded-lg border shadow-sm ${task.is_complete
+              ? 'bg-green-100 border-green-300 text-green-800'
+              : 'bg-orange-50 border-orange-200 text-orange-800'
+              }`}
           >
             <div className="flex justify-between items-start">
               <div className="flex-1 min-w-0">
                 <h5 className="font-medium truncate">{task.title}</h5>
                 {task.description && (
-                  <p className="text-sm text-gray-600 mt-1 truncate">{task.description}</p>
+                  <p className="text-sm mt-1 truncate">{task.description}</p>
                 )}
               </div>
-              <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                task.is_complete
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
+              <span className={`ml-2 px-2 py-1 text-xs rounded-full font-medium ${task.is_complete
+                ? 'bg-green-200 text-green-800'
+                : 'bg-orange-200 text-orange-800'
+                }`}>
                 {task.is_complete ? 'Completed' : 'Pending'}
               </span>
             </div>
@@ -71,18 +69,22 @@ const TasksDisplay: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
   );
 };
 
+
 interface ChatApiResponse {
   response: string;
   conversation_id: number;
   task_operations: Array<{
     operation: string;
-    status: string;
+    status: 'success' | 'failed';
+    error?: string;
     result?: {
+      task?: Task;
       tasks?: Task[];
     };
     task_data?: any;
   }>;
 }
+
 
 const FloatingChat: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -107,84 +109,58 @@ const FloatingChat: React.FC = () => {
   // Scroll to bottom of messages
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, taskOperations]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Function to execute MCP tools based on task operations
-  const executeMcpTools = async (operations: Array<{operation: string, status: string, result?: {tasks?: Task[]}, task_data?: any}>) => {
+
+
+
+ 
+  const executeMcpTools = async (operations: Array<{
+    operation: string,
+    status: 'success' | 'failed',
+    error?: string,
+    result?: { task?: Task; tasks?: Task[] },
+    arguments?: any,
+    task_data?: any
+  }>) => {
     for (const op of operations) {
-      // Create a temporary ID for this operation to track its status
       const tempOpId = `temp-${Date.now()}-${Math.random()}`;
 
-      // Add pending operation to state
-      const newTaskOp: TaskOperation = {
-        id: tempOpId,
-        operation: op.operation,
-        task_data: op.result?.tasks || op.task_data, // Prioritize tasks from result if available
-        timestamp: new Date(),
-        status: 'pending'
-      };
+      // 🔹 Safe task_data assignment
+      const taskData = op.status === 'failed'
+        ? op.error
+        : op.result?.task ?? op.result?.tasks ?? op.arguments ?? op.task_data ?? {};
 
-      setTaskOperations(prev => [...prev, newTaskOp]);
-
-      try {
-        // Simulate MCP tool execution based on operation type
-        switch(op.operation) {
-          case 'add_task':
-            // Assuming there's an MCP tool for adding tasks
-            console.log('Executing add_task:', op.task_data);
-            // Example: await MCP.perform('add_task', op.task_data);
-            break;
-          case 'update_task':
-            // Assuming there's an MCP tool for updating tasks
-            console.log('Executing update_task:', op.task_data);
-            // Example: await MCP.perform('update_task', op.task_data);
-            break;
-          case 'complete_task':
-            // Assuming there's an MCP tool for completing tasks
-            console.log('Executing complete_task:', op.task_data);
-            // Example: await MCP.perform('complete_task', op.task_data);
-            break;
-          case 'delete_task':
-            // Assuming there's an MCP tool for deleting tasks
-            console.log('Executing delete_task:', op.task_data);
-            // Example: await MCP.perform('delete_task', op.task_data);
-            break;
-          case 'list_tasks':
-            // Handle the result from list_tasks operation
-            console.log('Executing list_tasks, received tasks:', op.result?.tasks);
-            // Update the task_data to include the tasks from result
-            setTaskOperations(prev =>
-              prev.map(item =>
-                item.id === tempOpId ? {...item, task_data: op.result?.tasks, status: 'success'} : item
-              )
-            );
-            continue; // Skip the general success update since we already updated it
-          default:
-            console.log('Unknown operation:', op.operation);
+      // 🔹 Add task operation to state
+      setTaskOperations(prev => [
+        ...prev,
+        {
+          id: tempOpId,
+          operation: op.operation,
+          task_data: taskData,
+          timestamp: new Date(),
+          status: op.status === 'failed' ? 'error' : 'success',
         }
+      ]);
 
-        // Update task operation status to success
-        setTaskOperations(prev =>
-          prev.map(item =>
-            item.id === tempOpId ? {...item, status: 'success'} : item
-          )
-        );
-      } catch (error) {
-        console.error(`Error executing operation ${op.operation}:`, error);
-
-        // Update task operation status to error
-        setTaskOperations(prev =>
-          prev.map(item =>
-            item.id === tempOpId ? {...item, status: 'error'} : item
-          )
-        );
+      // 🔹 Handle task completion updates immediately
+      if (op.operation === 'complete_task' && op.status === 'success' && op.result?.task) {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          // Find and update any related messages if needed
+          return newMessages;
+        });
       }
     }
   };
+
+
+
+
 
   // Handle sending a message
   const handleSend = async () => {
@@ -216,34 +192,22 @@ const FloatingChat: React.FC = () => {
         conversation_id: conversationId,
       };
 
-      // Call the backend API
-      // const response = await fetch('http://127.0.0.1:8000/api/chat', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${token}`,
-      //   },
-      //   body: JSON.stringify(requestBody),
-      // });
-
-      // if (!response.ok) {
-      //   throw new Error(`API request failed with status ${response.status}`);
-      // }
+    
       const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL}/api/chat`,
-  {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(requestBody),
-  }
-);
+        `${process.env.NEXT_PUBLIC_API_URL}/api/chat`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
 
-if (!response.ok) {
-  throw new Error(`API request failed with status ${response.status}`);
-}
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
 
 
       const data: ChatApiResponse = await response.json();
@@ -403,58 +367,90 @@ if (!response.ok) {
 
                   {/* Render task operations */}
                   {taskOperations.map((operation) => {
-                    // Check if task_data contains tasks (array of Task objects)
-                    const hasTasks = operation.task_data && Array.isArray(operation.task_data) && operation.task_data.length > 0 && typeof operation.task_data[0]?.id !== 'undefined';
+                    const data = operation.task_data;
 
-                    return (
-                      <div
-                        key={operation.id}
-                        className="flex justify-center"
-                      >
-                        <div
-                          className={`max-w-[80%] relative group bg-blue-100 text-blue-800 rounded-2xl border-l-4 ${
-                            operation.status === 'success' ? 'border-green-500' :
-                            operation.status === 'error' ? 'border-red-500' : 'border-blue-500'
-                          }`}
-                        >
-                          <div className="p-3 whitespace-pre-wrap break-words">
-                            <div className="font-medium capitalize">
-                              {operation.operation.replace('_', ' ')}:
-                            </div>
+                    // Check if task exists
+                    const hasTask =
+                      data && typeof data === 'object' && 'id' in data;
 
-                            {/* If operation is list_tasks and has tasks, display them nicely */}
-                            {operation.operation === 'list_tasks' && hasTasks && (
-                              <TasksDisplay tasks={operation.task_data} />
-                            )}
+                return (
+  <div key={operation.id} className="flex justify-center">
+    <div
+      className={`max-w-[80%] relative group bg-blue-100 text-blue-800 rounded-2xl border-l-4 ${
+        operation.status === 'success'
+          ? 'border-green-500'
+          : operation.status === 'error'
+          ? 'border-red-500'
+          : 'border-blue-500'
+      }`}
+    >
+      <div className="p-3 whitespace-pre-wrap break-words max-h-60 overflow-auto">
+        <div className="font-medium capitalize">
+          {operation.operation.replace('_', ' ')}:
+        </div>
 
-                            {/* For other operations or when task_data is not an array of tasks */}
-                            {!hasTasks && operation.task_data && (
-                              <pre className="text-xs mt-1 overflow-x-auto">
-                                {JSON.stringify(operation.task_data, null, 2)}
-                              </pre>
-                            )}
+        {/* Render error if failed */}
+        {operation.status === 'error' && (
+          <pre className="text-xs mt-1 text-red-600 break-words whitespace-pre-wrap">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        )}
 
-                            <div className="text-xs mt-1 opacity-70">
-                              {operation.status === 'success' ? '✓ Success' :
-                               operation.status === 'error' ? '✗ Error' : 'Processing...'}
-                            </div>
-                          </div>
+        {/* Render task info if success and task exists */}
+        {operation.status === 'success' && hasTask && (
+          <div className="mt-1 text-sm text-gray-700">
+            <p><strong>Task ID:</strong> {data.id}</p>
+            {data.user_id && <p><strong>User ID:</strong> {data.user_id}</p>}
+            {data.title && <p><strong>Title:</strong> {data.title}</p>}
+            {data.description && <p><strong>Description:</strong> {data.description}</p>}
+            {typeof data.is_complete === 'boolean' && (
+              <p>
+                <strong>Status:</strong>
+                <span className={`ml-1 px-2 py-1 text-xs rounded-full font-medium ${
+                  data.is_complete
+                    ? 'bg-green-200 text-green-800'
+                    : 'bg-orange-200 text-orange-800'
+                }`}>
+                  {data.is_complete ? 'Completed' : 'Pending'}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
 
-                          {/* Delete button for task operations */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteItem(operation.id, 'task');
-                            }}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"
-                            aria-label="Delete task operation"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    );
+        {/* If no task and success but some other data */}
+        {operation.status === 'success' && !hasTask && data && (
+          <pre className="text-xs mt-1 break-words whitespace-pre-wrap max-h-40 overflow-auto">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        )}
+
+        <div className="text-xs mt-1 opacity-70">
+          {operation.status === 'success'
+            ? '✓ Success'
+            : operation.status === 'error'
+            ? '✗ Error'
+            : 'Processing...'}
+        </div>
+      </div>
+
+      {/* Delete button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteItem(operation.id, 'task');
+        }}
+        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"
+        aria-label="Delete task operation"
+      >
+        ×
+      </button>
+    </div>
+  </div>
+);
+
                   })}
+
                 </>
               )}
 
@@ -489,11 +485,10 @@ if (!response.ok) {
                 <button
                   onClick={handleSend}
                   disabled={isLoading || !inputValue.trim() || !isAuthenticated}
-                  className={`glass-button px-4 py-2 rounded-xl flex items-center justify-center ${
-                    isLoading || !inputValue.trim() || !isAuthenticated
-                      ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-white/90'
-                  }`}
+                  className={`glass-button px-4 py-2 rounded-xl flex items-center justify-center ${isLoading || !inputValue.trim() || !isAuthenticated
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-white/90'
+                    }`}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -519,5 +514,3 @@ if (!response.ok) {
 };
 
 export default FloatingChat;
-
-
